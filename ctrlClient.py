@@ -127,10 +127,12 @@ while True:
     try:
       # end of buffer at 9
       upDownValue, upDownDirection = getAscension(ABS_Z, ABS_RZ)
-      bytesToSend = bytes([getPWM(ABS_Y), getDirection(ABS_Y), upDownValue, upDownDirection])
+      intList = [getPWM(ABS_Y), getDirection(ABS_Y), upDownValue, upDownDirection, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+      bytesToSend = bytes(intList)
       print(bytesToSend)
       s.sendall(bytesToSend)
-      #data = s.recv(256)
+      data = s.recv(len(intList))
+      print(data)
     except:
       print('Disconnected from host.')
       break
