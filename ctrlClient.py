@@ -138,7 +138,5 @@ while True:
             print(data)
         except:
             print('Disconnected from host.')
+            s.close()
             break
-
-s.close()
-exit()
