@@ -85,8 +85,9 @@ def getPWM(value):
         return 127
     elif value >= 128 and value < 192:
         return 191
-    elif value >= 192 and value < 256:
+    elif value >= 192:
         return 255
+
     return 0
 
 
