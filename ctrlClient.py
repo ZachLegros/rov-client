@@ -132,7 +132,6 @@ while True:
             tmp = [ABS_RX, ABS_Y, ABS_Z, ABS_RZ,
                    BTN_EAST, BTN_TL, BTN_TR, BTN_START]
             if not values_in_list_different(last_read, tmp):
-                last_read = tmp
                 continue
             last_read = tmp
         except:
