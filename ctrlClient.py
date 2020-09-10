@@ -35,6 +35,8 @@ gp_state = {  # 'ABS_HAT0X' : 0, #-1 to 1
     # 'SYN_REPORT' : 0,
 }
 
+last_read = [0, 0, 0, 0, 0, 0, 0, 0]
+
 
 def map_range(value, leftMin, leftMax, rightMin, rightMax):
     leftSpan = leftMax - leftMin
@@ -107,6 +109,13 @@ def getAscension(up, down):
         return getPWM(down), 1
 
 
+def values_in_list_different(a1, a2):
+    for i in range(len(a1)):
+        if a1[i] != a2[i]:
+            return True
+    return False
+
+
 while True:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     print('Trying to connect...')
@@ -120,6 +129,12 @@ while True:
     while True:
         try:
             ABS_RX, ABS_Y, ABS_Z, ABS_RZ, BTN_EAST, BTN_TL, BTN_TR, BTN_START = read_keypad()
+            tmp = [ABS_RX, ABS_Y, ABS_Z, ABS_RZ,
+                   BTN_EAST, BTN_TL, BTN_TR, BTN_START]
+            if not values_in_list_different(last_read, tmp):
+                last_read = tmp
+                continue
+            last_read = tmp
         except:
             print('No keypad detected.')
             sleep(1)
