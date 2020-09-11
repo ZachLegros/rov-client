@@ -1,10 +1,12 @@
 import socket
+import threading
 from time import sleep
 from inputs import get_gamepad
 
 HOST = '192.168.1.2'  # The server's hostname or IP address
 PORT = 8080        # The port used by the server
 DEAD_ZONE = 7500
+data = [] # bytes (as int) for telemetry
 
 # descend: ABS_RZ
 # lock descend: BTN_TRc
@@ -35,7 +37,20 @@ gp_state = {  # 'ABS_HAT0X' : 0, #-1 to 1
     # 'SYN_REPORT' : 0,
 }
 
-last_read = [0, 0, 0, 0, 0, 0, 0, 0]
+class Telemetry(object):
+    def __init__(self, data_size):
+        self.lock = threading.Lock()
+        self.data_size = data_size
+        self.data = [0 for i in range(data_size)]
+    
+    def replace(self, new_data):
+        if len(new_data == self.data_size):
+            self.lock.acquire()
+            for i in range(self.data_size):
+                self.data[i] = new_data[i]
+            self.lock.release()
+            return
+        raise Exception("Data size does not match!")
 
 
 def map_range(value, leftMin, leftMax, rightMin, rightMax):
@@ -116,42 +131,54 @@ def values_in_list_different(a1, a2):
     return False
 
 
-while True:
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print('Trying to connect...')
-    try:
-        s.connect((HOST, PORT))
-        print(f'Connected to {HOST} {PORT}.')
-    except:
-        sleep(1)
-        continue
+def ctrl_socket(tel):
+    last_read = [0, 0, 0, 0, 0, 0, 0, 0]
+    sensor_bytes_length = 5 # bytes for telemetry
+    int_list_length = 16
 
     while True:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print('Trying to connect...')
         try:
-            ABS_RX, ABS_Y, ABS_Z, ABS_RZ, BTN_EAST, BTN_TL, BTN_TR, BTN_START = read_keypad()
-            tmp = [ABS_RX, ABS_Y, ABS_Z, ABS_RZ,
-                   BTN_EAST, BTN_TL, BTN_TR, BTN_START]
-            if not values_in_list_different(last_read, tmp):
-                continue
-            last_read = tmp
+            s.connect((HOST, PORT))
+            print(f'Connected to {HOST} {PORT}.')
         except:
-            print('No keypad detected.')
             sleep(1)
             continue
-        try:
-            # end of buffer at 9
-            upDownValue, upDownDirection = getAscension(ABS_Z, ABS_RZ)
-            intList = [getPWM(ABS_Y), getDirection(ABS_Y), upDownValue, upDownDirection, getPWM(ABS_RX),
-                       getDirection(
-                           ABS_RX), BTN_EAST, BTN_TL, BTN_TR, BTN_START,
-                       0, 0, 0, 0, 0,  # sensor bytes for arduino
-                       10]  # end line
-            bytesToSend = bytes(intList)
-            print(bytesToSend)
-            s.sendall(bytesToSend)
-            data = s.recv(len(intList))
-            print(data)
-        except:
-            print('Disconnected from host.')
-            s.close()
-            break
+
+        while True:
+            try:
+                ABS_RX, ABS_Y, ABS_Z, ABS_RZ, BTN_EAST, BTN_TL, BTN_TR, BTN_START = read_keypad()
+                tmp = [ABS_RX, ABS_Y, ABS_Z, ABS_RZ,
+                    BTN_EAST, BTN_TL, BTN_TR, BTN_START]
+                if not values_in_list_different(last_read, tmp):
+                    continue
+                last_read = tmp
+            except:
+                print('No keypad detected.')
+                sleep(1)
+                continue
+            try:
+                upDownValue, upDownDirection = getAscension(ABS_Z, ABS_RZ)
+                intList = [getPWM(ABS_Y), getDirection(ABS_Y), upDownValue, upDownDirection, getPWM(ABS_RX),
+                        getDirection(
+                            ABS_RX), BTN_EAST, BTN_TL, BTN_TR, BTN_START,
+                        0, 0, 0, 0, 0,  # sensor bytes for arduino
+                        10]  # end line
+                bytesToSend = bytes(intList)
+                print(bytesToSend)
+                s.sendall(bytesToSend)
+                data = list(s.recv(int_list_length))[int_list_length-sensor_bytes_length:int_list_length]
+                tel.replace(data)
+            except:
+                print('Disconnected from host.')
+                s.close()
+                break
+
+
+if __name__ == "__main__":
+    tel = Telemetry(5)
+    client = threading.Thread(target=ctrl_socket, args=(tel,))
+    client.start()
+    # server = threading.Thread(target=ctrl_socket, args=(tel,))
+    # server.start()
