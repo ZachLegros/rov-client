@@ -34,12 +34,12 @@ gp_state = {  # 'ABS_HAT0X' : 0, #-1 to 1
     # 'SYN_REPORT' : 0,
 }
 
+
 class Telemetry(object):
     def __init__(self, data_size):
         self.lock = threading.Lock()
         self.data_size = data_size
         self.data = [0 for i in range(data_size)]
-    
 
     def get_data(self):
         self.lock.acquire()
@@ -48,15 +48,13 @@ class Telemetry(object):
 
         return data
 
-
     def replace(self, new_data):
-        if len(new_data == self.data_size):
+        if len(new_data) == self.data_size:
             self.lock.acquire()
             for i in range(self.data_size):
                 self.data[i] = new_data[i]
             self.lock.release()
             return
-            
         raise Exception("Data size does not match!")
 
 
@@ -140,7 +138,7 @@ def values_in_list_different(a1, a2):
 
 def ctrl_socket(tel):
     last_read = [0, 0, 0, 0, 0, 0, 0, 0]
-    sensor_bytes_length = 5 # bytes for telemetry
+    sensor_bytes_length = 5  # bytes for telemetry
     int_list_length = 16
 
     while True:
@@ -157,7 +155,7 @@ def ctrl_socket(tel):
             try:
                 ABS_RX, ABS_Y, ABS_Z, ABS_RZ, BTN_EAST, BTN_TL, BTN_TR, BTN_START = read_keypad()
                 tmp = [ABS_RX, ABS_Y, ABS_Z, ABS_RZ,
-                    BTN_EAST, BTN_TL, BTN_TR, BTN_START]
+                       BTN_EAST, BTN_TL, BTN_TR, BTN_START]
                 if not values_in_list_different(last_read, tmp):
                     continue
                 last_read = tmp
@@ -168,15 +166,18 @@ def ctrl_socket(tel):
             try:
                 upDownValue, upDownDirection = getAscension(ABS_Z, ABS_RZ)
                 intList = [getPWM(ABS_Y), getDirection(ABS_Y), upDownValue, upDownDirection, getPWM(ABS_RX),
-                        getDirection(
-                            ABS_RX), BTN_EAST, BTN_TL, BTN_TR, BTN_START,
-                        0, 0, 0, 0, 0,  # sensor bytes for arduino
-                        10]  # end line
+                           getDirection(
+                    ABS_RX), BTN_EAST, BTN_TL, BTN_TR, BTN_START,
+                    0, 0, 0, 0, 0,  # sensor bytes for arduino
+                    10]  # end line
                 bytesToSend = bytes(intList)
-                print(bytesToSend)
                 s.sendall(bytesToSend)
-                data = list(s.recv(int_list_length))[int_list_length-sensor_bytes_length:int_list_length]
-                tel.replace(data)
+                data = list(s.recv(int_list_length))[
+                    int_list_length-sensor_bytes_length:int_list_length]
+                try:
+                    tel.replace(data)
+                except Exception as err:
+                    print(err)
             except:
                 print('Disconnected from host.')
                 s.close()
@@ -185,7 +186,6 @@ def ctrl_socket(tel):
 
 if __name__ == "__main__":
     tel = Telemetry(5)
-    client = threading.Thread(target=ctrl_socket, args=(tel,))
-    client.start()
     server = threading.Thread(target=start_server, args=(tel, 8000))
     server.start()
+    ctrl_socket(tel)
